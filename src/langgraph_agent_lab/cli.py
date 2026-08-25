@@ -11,7 +11,7 @@ import yaml
 
 from .graph import build_graph
 from .metrics import MetricsReport, metric_from_state, summarize_metrics, write_metrics
-from .persistence import build_checkpointer
+from .persistence import build_checkpointer, verify_state_history
 from .report import write_report
 from .scenarios import load_scenarios
 from .state import initial_state
@@ -30,12 +30,16 @@ def run_scenarios(
     checkpointer = build_checkpointer(cfg.get("checkpointer", "memory"), cfg.get("database_url"))
     graph = build_graph(checkpointer=checkpointer)
     metrics = []
+    last_thread_id = ""
     for scenario in scenarios:
         state = initial_state(scenario)
-        run_config = {"configurable": {"thread_id": state["thread_id"]}}
+        last_thread_id = state["thread_id"]
+        run_config = {"configurable": {"thread_id": last_thread_id}}
         final_state = graph.invoke(state, config=run_config)
         metrics.append(metric_from_state(final_state, scenario.expected_route.value, scenario.requires_approval))
-    report = summarize_metrics(metrics)
+    # Evidence for the persistence section: the checkpointer really kept a replayable history.
+    resume_success = bool(last_thread_id) and verify_state_history(graph, last_thread_id)
+    report = summarize_metrics(metrics, resume_success=resume_success)
     write_metrics(report, output)
     if cfg.get("report_path"):
         write_report(report, cfg["report_path"])

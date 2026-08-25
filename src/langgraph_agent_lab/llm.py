@@ -13,6 +13,13 @@ from __future__ import annotations
 
 import os
 
+try:  # Load .env once at import time so get_llm() sees the keys the student configured.
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:  # pragma: no cover - python-dotenv is optional
+    pass
+
 
 def get_llm(model: str | None = None, temperature: float = 0.0):
     """Create an LLM client from environment configuration.
